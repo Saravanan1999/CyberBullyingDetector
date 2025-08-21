@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyberbullying Detection - SHAP Waterfall Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-section {
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 30px;
+        }
+        .prediction-result {
+            background: #c0392b;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .prediction-result.cyberbullying {
+            background: #c0392b;
+            color: white;
+            border-left: 4px solid #e74c3c;
+        }
+        .prediction-result.not-cyberbullying {
+            background: #c0392b;
+            color: white;
+            border-left: 4px solid #e74c3c;
+        }
+        .chart-container {
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        
+        /* SHAP Waterfall Visualization Styles */
+        .shap-waterfall {
+            background: #2d2d2d;
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        }
+        
+        .shap-outputs {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .output-labels {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        
+        .output-values {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .not-cyberbullying {
+            background: #666;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            margin-right: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .cyberbullying {
+            background: #e74c3c;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .output-active {
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+            transform: scale(1.05);
+        }
+        
+        /* Removed old styles - now using inline styles for better control */
+        
+        .token-arrow {
+            position: absolute;
+            height: 28px; /* Default height, will be overridden */
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .token-arrow:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        
+        .input-text-display {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+            font-size: 16px;
+        }
+        
+        .highlighted-word {
+            padding: 2px 4px;
+            margin: 0 1px;
+            border-radius: 2px;
+            font-weight: bold;
+        }
+        
+        .token-attribution-table {
+            background: #2d2d2d;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        }
+        
+        .attribution-header {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #ecf0f1;
+        }
+        
+        .attribution-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #444;
+        }
+        
+        .attribution-row:last-child {
+            border-bottom: none;
+        }
+        
+        .token-name {
+            font-weight: bold;
+            flex: 1;
+        }
+        
+        .token-value {
+            font-family: monospace;
+            margin-left: 20px;
+        }
+        
+        .positive-contrib {
+            color: #2ecc71;
+        }
+        
+        .negative-contrib {
+            color: #e74c3c;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .feature-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+        }
+        .feature-item.positive {
+            border-left-color: #4caf50;
+        }
+        .feature-item.negative {
+            border-left-color: #f44336;
+        }
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .example-buttons {
+            margin: 15px 0;
+        }
+        .example-buttons button {
+            background: #95a5a6;
+            margin: 5px;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .example-buttons button:hover {
+            background: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Cyberbullying Detection - SHAP Waterfall Demo</h1>
+        
+        <div class="input-section">
+            <label for="textInput"><strong>Enter text to analyze:</strong></label>
+            <textarea id="textInput" placeholder="Type or paste text here to analyze for cyberbullying..."></textarea>
+            
+            <div class="example-buttons">
+                <strong>Quick Examples:</strong><br>
+                <button type="button" onclick="setExample('You are such a great friend!')">Positive Text</button>
+                <button type="button" onclick="setExample('You are literally the worst human being ever')">Cyberbullying Text</button>
+                <button type="button" onclick="setExample('Nobody likes you. Just leave already.')">Moderate Negative</button>
+                <button type="button" onclick="setExample('I hate you so much, you are stupid and ugly')">Strong Negative</button>
+            </div>
+            
+            <button onclick="analyzeText()" id="analyzeBtn">🔍 Analyze Text</button>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+            <div id="predictionResult" class="prediction-result">
+                <!-- Prediction results will be shown here -->
+            </div>
+            
+            <!-- SHAP Waterfall Visualization (like your image) -->
+            <div class="shap-waterfall">
+                <div class="shap-outputs">
+                    <h3 style="color: #ecf0f1; margin: 0 0 15px 0; text-align: center; font-size: 18px;">
+                        SHAP Word Importance Analysis
+                    </h3>
+                    <div style="text-align: center; margin-bottom: 15px; font-size: 14px; color: #bdc3c7;">
+                        Prediction: <span id="predictionLabel" style="font-weight: bold; color: #e74c3c;">Cyberbullying</span>
+                        (<span id="confidenceLabel">76.1%</span> confidence)
+                    </div>
+                    <div class="legend" style="display: flex; justify-content: center; gap: 20px; margin-bottom: 15px; font-size: 12px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 20px; height: 15px; background: #e74c3c; border-radius: 3px;"></div>
+                            <span style="color: #ecf0f1;">Increases cyberbullying likelihood</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 20px; height: 15px; background: #3498db; border-radius: 3px;"></div>
+                            <span style="color: #ecf0f1;">Decreases cyberbullying likelihood</span>
+                        </div>
+                    </div>
+                    <div style="text-align: center; margin-bottom: 20px; font-size: 11px; color: #95a5a6; max-width: 600px; margin-left: auto; margin-right: auto;">
+                        <strong>Base Value:</strong> Model's initial prediction without seeing any words • 
+                        <strong>Final Score:</strong> Final prediction after considering all word contributions
+                    </div>
+                </div>
+                
+                <div class="shap-scale" id="shapScale">
+                    <!-- Scale marks will be added here -->
+                </div>
+                
+                <!-- Centered Arrow Container with Proper Base/Final Value Positioning -->
+                <div style="display: flex; justify-content: center; width: 100%; margin: 20px 0;">
+                    <div style="position: relative; width: 90%; max-width: 900px;">
+                        <!-- Base Value (positioned at actual start of arrows) -->
+                        <div id="baseValueMarker" style="position: absolute; top: -15px; z-index: 20;">
+                            <div style="background: #34495e; color: #ecf0f1; padding: 8px 12px; border-radius: 6px; border: 2px solid #5d6d7e; box-shadow: 0 3px 6px rgba(0,0,0,0.4); text-align: center; min-width: 80px;">
+                                <div style="font-size: 10px; color: #bdc3c7; margin-bottom: 2px;">Base Value</div>
+                                <div id="baseValueText" style="font-weight: bold; font-size: 12px;">0.110377</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Final Value (positioned at actual end of arrows) -->
+                        <div id="finalValueMarker" style="position: absolute; top: -15px; z-index: 20;">
+                            <div style="background: #34495e; color: #ecf0f1; padding: 8px 12px; border-radius: 6px; border: 2px solid #5d6d7e; box-shadow: 0 3px 6px rgba(0,0,0,0.4); text-align: center; min-width: 80px;">
+                                <div style="font-size: 10px; color: #bdc3c7; margin-bottom: 2px;">Final Score</div>
+                                <div id="finalValueText" style="font-weight: bold; font-size: 12px;">0.814863</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Arrow Container -->
+                        <div class="shap-arrows" id="shapArrows" style="position: relative; height: 60px; margin: 30px 0 15px 0; overflow: visible; width: 100%;">
+                            <!-- Token arrows will be added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Token Attribution Table (like your image) -->
+            <div class="token-attribution-table">
+                <div class="attribution-header">Top Token Attributions:</div>
+                <div id="tokenAttributions">
+                    <!-- Token attributions will be listed here -->
+                </div>
+            </div>
+            
+            <!-- Feature contributions (existing) -->
+            <div id="featureList" class="feature-list">
+                <!-- Feature contributions will be listed here -->
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            🔄 Analyzing text...
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            <!-- Error messages will be shown here -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:7899';
+        let chart = null;
+
+        function setExample(text) {
+            document.getElementById('textInput').value = text;
+        }
+
+        async function analyzeText() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                showError('Please enter some text to analyze.');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+            hideResults();
+
+            try {
+                // Call the SHAP explanation endpoint
+                const response = await fetch(`${API_BASE}/explain/shap`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                                 showError(`Failed to analyze text: ${error.message}. Make sure the API server is running on ${API_BASE}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayResults(data) {
+            // Show prediction result
+            const predictionDiv = document.getElementById('predictionResult');
+            const isCyberbullying = data.prediction === 1;
+            const confidence = (data.probability * 100).toFixed(1);
+            
+            predictionDiv.className = `prediction-result ${isCyberbullying ? 'cyberbullying' : 'not-cyberbullying'}`;
+            predictionDiv.innerHTML = `
+                <h3>🎯 Prediction Result</h3>
+                <p><strong>Text:</strong> "${data.text}"</p>
+                <p><strong>Classification:</strong> ${data.label}</p>
+                <p><strong>Confidence:</strong> ${confidence}%</p>
+                <p><strong>Base Value:</strong> ${data.base_value.toFixed(4)}</p>
+                <p><strong>Final Value:</strong> ${data.expected_value.toFixed(4)}</p>
+            `;
+
+            // Create SHAP waterfall visualization (like your image)
+            createShapVisualization(data);
+
+            // Show feature contributions
+            displayFeatureContributions(data.feature_contributions);
+
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function createShapVisualization(data) {
+            const tokens = data.token_contributions;
+            const baseValue = data.base_value;
+            const finalValue = data.expected_value;
+            const label = data.label;
+            const prediction = data.prediction;
+            
+            // Update prediction label and confidence
+            const predictionLabel = document.getElementById('predictionLabel');
+            const confidenceLabel = document.getElementById('confidenceLabel');
+            
+            predictionLabel.textContent = label;
+            predictionLabel.style.color = prediction === 1 ? '#e74c3c' : '#2ecc71';
+            confidenceLabel.textContent = `${(data.probability * 100).toFixed(1)}%`;
+            
+            document.getElementById('baseValueText').textContent = baseValue.toFixed(6);
+            document.getElementById('finalValueText').textContent = finalValue.toFixed(6);
+            
+            // Create arrows for tokens
+            createTokenArrows(tokens, baseValue, finalValue);
+            
+            // Create token attribution table
+            createTokenAttributionTable(tokens);
+        }
+        
+
+        
+        function createTokenArrows(tokens, baseValue, finalValue) {
+            const arrowContainer = document.getElementById('shapArrows');
+            arrowContainer.innerHTML = '';
+            
+            const containerWidth = arrowContainer.offsetWidth || 800;
+            
+            // Sort tokens by importance (absolute SHAP value) for sizing
+            const sortedTokens = [...tokens].sort((a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value));
+            const maxAbsValue = Math.abs(sortedTokens[0]?.shap_value || 1);
+            
+            // Calculate proportional widths based on importance ranking
+            const arrowWidths = [];
+            let totalWidth = 0;
+            
+            tokens.forEach((token, index) => {
+                const importance = Math.abs(token.shap_value);
+                const importanceRatio = importance / (maxAbsValue || 1);
+                
+                // Size based on importance: high importance = bigger arrow
+                const minWidth = 70;  // Minimum width for readability
+                const maxWidth = 150; // Maximum width for most important tokens
+                const width = minWidth + (maxWidth - minWidth) * importanceRatio;
+                
+                arrowWidths.push(Math.round(width)); // Round to avoid sub-pixel rendering
+                totalWidth += width;
+            });
+            
+            // Adjust if total width exceeds container and center the arrows
+            const actualTotalWidth = totalWidth - (tokens.length - 1) * 8; // Account for overlaps
+            const startLeft = Math.max(20, (containerWidth - actualTotalWidth) / 2 + 30); // Center the arrows, shifted right
+            
+            if (totalWidth > containerWidth * 0.9) {
+                const scaleFactor = (containerWidth * 0.9) / totalWidth;
+                arrowWidths.forEach((width, i) => {
+                    arrowWidths[i] = width * scaleFactor;
+                });
+            }
+            
+            let currentLeft = startLeft;
+            
+            tokens.forEach((token, index) => {
+                const arrow = document.createElement('div');
+                arrow.className = 'token-arrow';
+                
+                arrow.style.width = `${arrowWidths[index]}px`;
+                arrow.style.left = `${currentLeft}px`;
+                
+                // Make height proportional to contribution (importance)
+                const importance = Math.abs(token.shap_value);
+                const importanceRatio = importance / (maxAbsValue || 1);
+                const minHeight = 28;
+                const maxHeight = 50;
+                const height = minHeight + (maxHeight - minHeight) * importanceRatio;
+                arrow.style.height = `${Math.round(height)}px`;
+                arrow.style.lineHeight = `${Math.round(height)}px`;
+                
+                // Color based on contribution (negative SHAP values increase cyberbullying)
+                if (token.shap_value < 0) {
+                    arrow.style.backgroundColor = '#e74c3c'; // Red for negative (increasing cyberbullying)
+                } else {
+                    arrow.style.backgroundColor = '#3498db'; // Blue for positive (decreasing cyberbullying)
+                }
+                
+                // Adjust font styling based on importance
+                const fontSize = importanceRatio > 0.3 ? 13 : 12; // Slightly bigger font for important tokens
+                arrow.style.fontSize = `${fontSize}px`;
+                arrow.style.fontWeight = importanceRatio > 0.3 ? 'bold' : '600';
+                
+                arrow.textContent = token.token.trim();
+                
+                // Format tooltip value properly
+                let tooltipValue;
+                const absValue = Math.abs(token.shap_value);
+                if (absValue === 0) {
+                    tooltipValue = '0.0000';
+                } else if (absValue < 0.0001) {
+                    tooltipValue = token.shap_value.toExponential(3);
+                } else {
+                    tooltipValue = token.shap_value.toFixed(4);
+                }
+                
+                arrow.title = `${token.token.trim()}: ${token.shap_value >= 0 ? '+' : ''}${tooltipValue}`;
+                
+                arrowContainer.appendChild(arrow);
+                
+                currentLeft += arrowWidths[index] - 8; // Overlap slightly
+            });
+            
+            // Position base value marker on top of the first arrow
+            const baseMarker = document.getElementById('baseValueMarker');
+            if (baseMarker) {
+                baseMarker.style.left = `${startLeft + arrowWidths[0]/2 - 55}px`; // Center on first arrow, shifted left
+            }
+            
+            // Position final value marker on top of the last arrow (like base value on first arrow)
+            const finalMarker = document.getElementById('finalValueMarker');
+            if (finalMarker && tokens.length > 0) {
+                const lastArrowEnd = currentLeft - arrowWidths[tokens.length - 1] + 8; // Position on top of last arrow
+                finalMarker.style.left = `${lastArrowEnd + arrowWidths[tokens.length - 1]/2 - 40}px`; // Center on last arrow
+            }
+        }
+        
+
+        
+        function createTokenAttributionTable(tokens) {
+            const container = document.getElementById('tokenAttributions');
+            container.innerHTML = '';
+            
+            // Sort by absolute importance (descending - most important first)
+            const sortedTokens = [...tokens].sort((a, b) => Math.abs(b.shap_value) - Math.abs(a.shap_value));
+            
+            sortedTokens.slice(0, 10).forEach(token => {
+                const row = document.createElement('div');
+                row.className = 'attribution-row';
+                
+                const name = document.createElement('div');
+                name.className = 'token-name';
+                name.textContent = token.token.trim();
+                
+                const value = document.createElement('div');
+                value.className = `token-value ${token.shap_value >= 0 ? 'positive-contrib' : 'negative-contrib'}`;
+                
+                // Format small values properly using scientific notation if needed
+                let formattedValue;
+                const absValue = Math.abs(token.shap_value);
+                
+                if (absValue === 0) {
+                    formattedValue = '0.0000';
+                } else if (absValue < 0.0001) {
+                    // Use scientific notation for very small values
+                    formattedValue = token.shap_value.toExponential(3);
+                } else {
+                    // Use regular decimal notation
+                    formattedValue = token.shap_value.toFixed(4);
+                }
+                
+                value.textContent = `→ ${token.shap_value >= 0 ? '+' : ''}${formattedValue}`;
+                
+                row.appendChild(name);
+                row.appendChild(value);
+                container.appendChild(row);
+            });
+        }
+
+        function displayFeatureContributions(contributions) {
+            const container = document.getElementById('featureList');
+            container.innerHTML = '<h3>📊 Feature Contributions</h3>';
+            
+            contributions.forEach(contrib => {
+                const div = document.createElement('div');
+                div.className = `feature-item ${contrib.contribution_type}`;
+                
+                const impact = contrib.shap_value > 0 ? '↗️ Increases' : '↘️ Decreases';
+                const impactText = contrib.shap_value > 0 ? 'cyberbullying likelihood' : 'cyberbullying likelihood';
+                
+                div.innerHTML = `
+                    <strong>${contrib.feature_name.replace('_', ' ').toUpperCase()}</strong><br>
+                    <span style="color: ${contrib.shap_value > 0 ? '#4CAF50' : '#F44336'};">
+                        ${impact} ${impactText}
+                    </span><br>
+                    <small>
+                        SHAP Value: ${contrib.shap_value > 0 ? '+' : ''}${contrib.shap_value.toFixed(4)}<br>
+                        Feature Value: ${contrib.feature_value.toFixed(3)}
+                    </small>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('analyzeBtn').disabled = show;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+
+
+        function hideResults() {
+            document.getElementById('results').style.display = 'none';
+        }
+
+        // Allow Enter key to trigger analysis
+        document.getElementById('textInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                analyzeText();
+            }
+        });
+    </script>
+</body>
+</html> 
